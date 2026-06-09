@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CC Usage</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div class="brand">
+          <div class="brand-icon">CC</div>
+          <div>
+            <h1>Usage</h1>
+            <p>Claude Code usage &amp; costs</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button id="refresh" class="primary" type="button">
+            <span class="btn-label">Refresh</span>
+            <span id="header-spinner" class="header-spinner hidden" aria-hidden="true"></span>
+          </button>
+        </div>
+      </header>
+
+      <p id="status" class="status hidden" role="status"></p>
+
+      <div id="content">
+        <div class="cards" id="cards"></div>
+
+        <section class="panel" id="chart-panel">
+          <div class="panel-head">
+            <div class="panel-head-left">
+              <h2 id="chart-title">Cost</h2>
+              <div id="granularity" class="granularity" role="group" aria-label="Time granularity">
+                <button type="button" class="gran active" data-granularity="daily">Daily</button>
+                <button type="button" class="gran" data-granularity="weekly">Weekly</button>
+                <button type="button" class="gran" data-granularity="monthly">Monthly</button>
+              </div>
+            </div>
+            <div class="window-picker" id="chart-window">
+              <select id="window-size" class="window-select" aria-label="Chart time window"></select>
+            </div>
+          </div>
+          <div class="chart-layout">
+            <div class="chart-y-axis" id="chart-y-axis" aria-hidden="true"></div>
+            <div class="chart" id="chart"></div>
+          </div>
+          <div class="chart-legend" id="chart-legend"></div>
+          <div id="chart-float-tooltip" class="chart-float-tooltip hidden" role="tooltip"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2 id="table-title">Breakdown</h2>
+            <span id="table-hint" class="panel-hint"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead id="table-head"></thead>
+              <tbody id="table-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <p class="meta" id="meta"></p>
+      </div>
+    </div>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

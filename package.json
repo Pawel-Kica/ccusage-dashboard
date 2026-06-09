@@ -1,0 +1,15 @@
+{
+  "name": "ccusage-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "open": "node server.mjs --open",
+    "install-service": "node scripts/install-service.mjs",
+    "uninstall-service": "node scripts/uninstall-service.mjs"
+  },
+  "dependencies": {
+    "ccusage": "^20.0.8"
+  }
+}
