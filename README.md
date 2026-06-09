@@ -67,4 +67,4 @@ PORT=4000 npm run install-service
 
 ## License
 
-Private personal project. All rights reserved.
+MIT — see [LICENSE](LICENSE).
