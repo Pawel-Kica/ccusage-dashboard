@@ -32,9 +32,9 @@ const CHART_BAR_HEIGHT = 180;
 const GRANULARITIES = new Set(["daily", "weekly", "monthly"]);
 
 const GRAN_META = {
-  daily: { label: "Today" },
-  weekly: { label: "This week" },
-  monthly: { label: "This month" },
+  daily: { label: "Today", avgLabel: "Avg per day" },
+  weekly: { label: "This week", avgLabel: "Avg per week" },
+  monthly: { label: "This month", avgLabel: "Avg per month" },
 };
 
 let granularity = readGranularity();
@@ -380,7 +380,7 @@ function renderCards(rows, labelKey, kind) {
       cls: "cost",
     },
     {
-      label: "Avg per period",
+      label: gm.avgLabel,
       value: fmtCost(rows.length ? cost / rows.length : 0),
       sub: fmtTokens(tokens) + " tokens total",
     },
