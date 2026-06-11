@@ -12,7 +12,10 @@
         <div class="brand">
           <div class="brand-icon">CC</div>
           <div>
-            <h1>Usage</h1>
+            <div class="brand-title-row">
+              <h1>Usage</h1>
+              <span id="plan-badge" class="plan-badge hidden"></span>
+            </div>
             <p>Claude Code usage &amp; costs</p>
           </div>
         </div>
@@ -43,6 +46,7 @@
               <select id="window-size" class="window-select" aria-label="Chart time window"></select>
             </div>
           </div>
+          <div id="limit-bars" class="limit-bars hidden" aria-label="Plan usage limits"></div>
           <div class="chart-layout">
             <div class="chart-y-axis" id="chart-y-axis" aria-hidden="true"></div>
             <div class="chart" id="chart"></div>

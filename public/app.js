@@ -39,7 +39,9 @@ const GRAN_META = {
 
 let granularity = readGranularity();
 let lastBody = null;
+let lastPlanBody = null;
 const inflight = new Map();
+const PLAN_CACHE_KEY = `${STORAGE_PREFIX}plan`;
 
 function readWindowSizes() {
   try {
@@ -328,11 +330,168 @@ function setStatus(text, isError = false) {
   el.classList.toggle("error", isError);
 }
 
+function formatPlanName(plan) {
+  if (!plan) return null;
+  const type = plan.subscriptionType;
+  const tier = plan.rateLimitTier ?? "";
+  const mult = tier.match(/max_(\d+)x/i);
+  if (mult) return `Claude Max ${mult[1]}x`;
+  if (type === "pro") return "Claude Pro";
+  if (type === "max") return "Claude Max";
+  if (type) return `Claude ${type.charAt(0).toUpperCase()}${type.slice(1)}`;
+  return null;
+}
+
+function utilizationTone(pct) {
+  if (pct == null || Number.isNaN(pct)) return "";
+  if (pct >= 85) return "danger";
+  if (pct >= 60) return "warn";
+  return "";
+}
+
+function formatResetCountdown(resetsAt) {
+  if (!resetsAt) return "—";
+  const target = new Date(resetsAt);
+  if (Number.isNaN(target.getTime())) return "—";
+  const ms = target.getTime() - Date.now();
+  if (ms <= 0) return "resetting soon";
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const rel = h > 0 ? `${h}h ${m}m` : `${m}m`;
+  const at = target.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `resets in ${rel} · ${at}`;
+}
+
+function formatSessionWindow(session) {
+  if (!session?.startTime) return "5-hour window";
+  const start = new Date(session.startTime);
+  const end = session.endTime ? new Date(session.endTime) : null;
+  const fmt = (d) =>
+    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  if (end && !Number.isNaN(end.getTime())) {
+    return `${fmt(start)} – ${fmt(end)}${session.isActive ? " · active" : ""}`;
+  }
+  return `${fmt(start)} · ${session.isActive ? "active" : "last block"}`;
+}
+
+function readPlanCache() {
+  try {
+    const raw = sessionStorage.getItem(PLAN_CACHE_KEY);
+    if (!raw) return null;
+    const entry = JSON.parse(raw);
+    if (Date.now() > entry.expiresAt) {
+      sessionStorage.removeItem(PLAN_CACHE_KEY);
+      return null;
+    }
+    return entry.body;
+  } catch {
+    return null;
+  }
+}
+
+function writePlanCache(body) {
+  try {
+    sessionStorage.setItem(
+      PLAN_CACHE_KEY,
+      JSON.stringify({ expiresAt: Date.now() + CACHE_TTL_MS, body }),
+    );
+  } catch {
+    /* quota */
+  }
+}
+
+function renderPlanBadge(planBody) {
+  const badge = $("#plan-badge");
+  const name = formatPlanName(planBody?.plan);
+  if (!name) {
+    badge.classList.add("hidden");
+    badge.textContent = "";
+    return;
+  }
+  badge.textContent = name;
+  badge.classList.remove("hidden");
+}
+
+function renderLimitBars(planBody) {
+  const el = $("#limit-bars");
+  const limits = planBody?.limits;
+
+  if (!limits && planBody?.limitsError) {
+    el.classList.remove("hidden");
+    el.classList.add("error");
+    el.innerHTML = `<div class="limit-note">Plan limits unavailable · ${planBody.limitsError}</div>`;
+    return;
+  }
+
+  if (!limits) {
+    el.classList.add("hidden");
+    el.innerHTML = "";
+    return;
+  }
+
+  const rows = [
+    { key: "five_hour", label: "5-hour" },
+    { key: "seven_day", label: "7-day" },
+  ];
+
+  el.classList.remove("hidden", "error");
+  el.innerHTML = rows
+    .map(({ key, label }) => {
+      const bucket = limits[key];
+      if (!bucket) {
+        return `
+        <div class="limit-row">
+          <div class="limit-head">
+            <span class="limit-label">${label}</span>
+            <span class="limit-pct">—</span>
+            <span class="limit-reset">unavailable</span>
+          </div>
+          <div class="limit-track"><div class="limit-fill" style="width:0%"></div></div>
+        </div>`;
+      }
+
+      const pct = Number(bucket.utilization ?? 0);
+      const tone = utilizationTone(pct);
+      const width = Math.min(100, Math.max(0, pct));
+
+      return `
+      <div class="limit-row">
+        <div class="limit-head">
+          <span class="limit-label">${label}</span>
+          <span class="limit-pct${tone ? ` ${tone}` : ""}">${Math.round(pct)}%</span>
+          <span class="limit-reset">${formatResetCountdown(bucket.resets_at)}</span>
+        </div>
+        <div class="limit-track">
+          <div class="limit-fill${tone ? ` ${tone}` : ""}" style="width:${width}%"></div>
+        </div>
+      </div>`;
+    })
+    .join("");
+}
+
+function renderPlan(planBody) {
+  lastPlanBody = planBody;
+  renderPlanBadge(planBody);
+  renderLimitBars(planBody);
+}
+
 function showSkeleton() {
-  $("#cards").innerHTML = [1, 2, 3]
+  $("#cards").innerHTML = [1, 2, 3, 4]
     .map(
       () =>
         `<div class="card skeleton"><div class="sk-line w40"></div><div class="sk-line w70 tall"></div><div class="sk-line w30"></div></div>`,
+    )
+    .join("");
+  $("#limit-bars").classList.remove("hidden");
+  $("#limit-bars").innerHTML = [1, 2]
+    .map(
+      () =>
+        `<div class="limit-row skeleton"><div class="sk-line w30"></div><div class="sk-line" style="height:8px"></div></div>`,
     )
     .join("");
   $("#chart").innerHTML = `<div class="chart-skeleton">${Array.from({ length: 10 }, () => `<div class="sk-bar"></div>`).join("")}</div>`;
@@ -356,7 +515,7 @@ function renderFromBody(body) {
   $("#table-title").textContent = `Last ${windowLabelFor(granularity)}`;
   $("#table-hint").textContent = `${windowed.length} periods`;
 
-  renderCards(windowed, norm.labelKey, kind);
+  renderCards(windowed, norm.labelKey, kind, lastPlanBody);
   renderChart(windowed, norm.labelKey, kind);
   renderTable(windowed, norm.labelKey, kind);
 
@@ -367,10 +526,11 @@ function renderFromBody(body) {
   $("#meta").textContent = `Updated ${new Date(body.fetchedAt).toLocaleString()} · ${body.source} · ${granularity}${expires ? ` · ${cached} until ${expires}` : ""}`;
 }
 
-function renderCards(rows, labelKey, kind) {
+function renderCards(rows, labelKey, kind, planBody) {
   const { cost, tokens } = totalsFrom(rows);
   const current = currentPeriodRow(sortRows(rows, labelKey), kind, labelKey);
   const gm = GRAN_META[granularity];
+  const session = planBody?.session;
 
   const cards = [
     {
@@ -383,6 +543,12 @@ function renderCards(rows, labelKey, kind) {
       label: gm.avgLabel,
       value: fmtCost(rows.length ? cost / rows.length : 0),
       sub: fmtTokens(tokens) + " tokens total",
+    },
+    {
+      label: "Current session",
+      value: session ? fmtCost(session.costUSD) : "—",
+      sub: session ? formatSessionWindow(session) : planBody?.sessionError ?? "5-hour window",
+      cls: session ? "cost" : "",
     },
   ];
 
@@ -599,6 +765,17 @@ function renderTable(rows, labelKey, kind) {
     : `<tr><td colspan="8" class="empty">No data for this range</td></tr>`;
 }
 
+async function fetchPlan(force) {
+  const params = new URLSearchParams();
+  if (force) params.set("refresh", "1");
+
+  const res = await fetch(`/api/plan?${params}`);
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || body.detail || "Plan request failed");
+  writePlanCache(body);
+  return body;
+}
+
 async function fetchUsage(source, reportType, force) {
   const since = sinceParamFor(reportType);
   const key = `${source}:${reportType}:${since}`;
@@ -624,8 +801,10 @@ async function load({ force = false } = {}) {
   const source = SOURCE;
   const activeGran = granularity;
   const cached = !force && readClientCache(source, granularity);
+  const cachedPlan = !force && readPlanCache();
 
   setStatus("");
+  if (cachedPlan) renderPlan(cachedPlan);
   if (cached) {
     renderFromBody(cached);
   } else {
@@ -634,8 +813,20 @@ async function load({ force = false } = {}) {
 
   setHeaderLoading(true);
   try {
-    const body = await fetchUsage(source, granularity, force);
+    const [body, planBody] = await Promise.all([
+      fetchUsage(source, granularity, force),
+      fetchPlan(force).catch((err) => ({
+        plan: cachedPlan?.plan ?? null,
+        limits: cachedPlan?.limits ?? null,
+        limitsError: err.message,
+        session: cachedPlan?.session ?? null,
+        sessionError: err.message,
+        fetchedAt: new Date().toISOString(),
+      })),
+    ]);
+
     if (granularity === activeGran) {
+      renderPlan(planBody);
       renderFromBody(body);
     }
   } catch (err) {
