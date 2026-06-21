@@ -355,9 +355,10 @@ function formatResetCountdown(resetsAt) {
   if (Number.isNaN(target.getTime())) return "—";
   const ms = target.getTime() - Date.now();
   if (ms <= 0) return "resetting soon";
-  const h = Math.floor(ms / 3600000);
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor((ms % 86400000) / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
-  const rel = h > 0 ? `${h}h ${m}m` : `${m}m`;
+  const rel = d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`;
   const at = target.toLocaleString(undefined, {
     month: "short",
     day: "numeric",
