@@ -240,6 +240,14 @@ function fmtDateDashWeekday(d) {
   return `${fmtDayMonthYear(d)} - ${weekday}`;
 }
 
+// "2026-05" -> "May". Null when raw is not YYYY-MM.
+function fmtMonthName(raw, withYear = false) {
+  const m = String(raw ?? "").match(/^(\d{4})-(\d{2})/);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, 1);
+  return d.toLocaleDateString(undefined, withYear ? { month: "long", year: "numeric" } : { month: "long" });
+}
+
 function axisLabel(row, labelKey, kind) {
   const raw = String(rawPeriod(row, labelKey, kind) ?? "");
   if (!raw) return "—";
@@ -255,11 +263,8 @@ function axisLabel(row, labelKey, kind) {
     }
   }
   if (kind === "monthly") {
-    const [y, m] = raw.split("-");
-    if (y && m) {
-      const d = new Date(Number(y), Number(m) - 1, 1);
-      return d.toLocaleDateString(undefined, { month: "short", year: "2-digit" });
-    }
+    const name = fmtMonthName(raw);
+    if (name) return name;
   }
   return raw.length > 12 ? raw.slice(0, 10) : raw;
 }
@@ -274,6 +279,10 @@ function peakLegendLabel(row, labelKey, kind) {
       return `${fmtDayMonth(d)} · ${wd}`;
     }
   }
+  if (kind === "monthly") {
+    const name = fmtMonthName(raw, true);
+    if (name) return name;
+  }
   return String(raw);
 }
 
@@ -285,7 +294,7 @@ function barTooltipHtml(row, labelKey, kind, cost) {
       return `${fmtDateDashWeekday(d)}<br><strong>${fmtCost(cost)}</strong><br>${fmtTokens(rowTokens(row))} tok`;
     }
   }
-  const label = raw ? String(raw) : "—";
+  const label = (kind === "monthly" && fmtMonthName(raw, true)) || (raw ? String(raw) : "—");
   return `${label}<br><strong>${fmtCost(cost)}</strong><br>${fmtTokens(rowTokens(row))} tok`;
 }
 
