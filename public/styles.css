@@ -585,6 +585,12 @@ button.primary:hover:not(:disabled) {
   transition: height 0.35s ease, filter 0.15s;
 }
 
+.bar-fill.bar-empty {
+  min-height: 0;
+  border-radius: 2px;
+  background: var(--border);
+}
+
 .bar-fill.active {
   background: linear-gradient(180deg, #8ef5dc 0%, var(--mint) 50%, rgba(105, 227, 198, 0.35) 100%);
 }
@@ -783,6 +789,11 @@ tr.subrow td {
 
 tr.period-row td {
   vertical-align: middle;
+}
+
+tr.period-row.empty-row td {
+  color: var(--text-dim);
+  opacity: 0.55;
 }
 
 tr.period-row.expandable {

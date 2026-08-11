@@ -207,7 +207,69 @@ function sortRows(rows, labelKey) {
 
 function windowRows(rows, labelKey, kind) {
   const sorted = sortRows(rows, labelKey);
-  return sorted.slice(-getWindowSize(kind));
+  return fillGaps(sorted, labelKey, kind).slice(-getWindowSize(kind));
+}
+
+function dayKey(d) {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+// Continuous period keys from `from` up to the current period, inclusive.
+function periodKeysFrom(from, kind) {
+  const keys = [];
+
+  if (kind === "monthly") {
+    const now = new Date();
+    const end = now.getFullYear() * 12 + now.getMonth();
+    for (let i = from.getFullYear() * 12 + from.getMonth(); i <= end; i++) {
+      keys.push(`${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, "0")}`);
+    }
+    return keys;
+  }
+
+  const last = new Date();
+  if (kind === "weekly") last.setDate(last.getDate() - last.getDay());
+  const endKey = dayKey(last);
+  const cur = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  while (dayKey(cur) <= endKey) {
+    keys.push(dayKey(cur));
+    cur.setDate(cur.getDate() + (kind === "weekly" ? 7 : 1));
+  }
+  return keys;
+}
+
+// Start of the selected window: N periods back from the current one, inclusive.
+function windowStartDate(kind) {
+  const n = getWindowSize(kind);
+  const now = new Date();
+  if (kind === "monthly") return new Date(now.getFullYear(), now.getMonth() - (n - 1), 1);
+  const daysBack = kind === "weekly" ? now.getDay() + (n - 1) * 7 : n - 1;
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysBack);
+}
+
+function emptyRow(key, labelKey) {
+  return { [labelKey]: key, totalCost: 0, isEmpty: true };
+}
+
+// Periods with no usage are absent from ccusage output; re-insert them as zero rows so
+// the timeline stays continuous. The fetch always covers the whole window, so anything
+// missing inside it is genuinely zero.
+function fillGaps(sorted, labelKey, kind) {
+  if (!sorted.length) return sorted;
+  const firstRow = parsePeriodDate(rawPeriod(sorted[0], labelKey, kind));
+  if (!firstRow) return sorted;
+  // Monthly windows reach back further than the recorded history, so they start at the
+  // first recorded month instead of inventing empty years. Day/week windows are short
+  // enough to sit inside the history, so they start at the window edge.
+  const windowStart = kind === "monthly" ? firstRow : windowStartDate(kind);
+  const first = firstRow < windowStart ? firstRow : windowStart;
+
+  const byKey = new Map(sorted.map((r) => [String(rawPeriod(r, labelKey, kind)), r]));
+  const filled = periodKeysFrom(first, kind).map((k) => byKey.get(k) ?? emptyRow(k, labelKey));
+  const kept = filled.filter((r) => !r.isEmpty).length;
+  return kept === sorted.length ? filled : sorted;
 }
 
 function rawPeriod(row, labelKey, kind) {
@@ -288,14 +350,16 @@ function peakLegendLabel(row, labelKey, kind) {
 
 function barTooltipHtml(row, labelKey, kind, cost) {
   const raw = rawPeriod(row, labelKey, kind);
+  const body = row.isEmpty
+    ? `<strong>No usage</strong>`
+    : `<strong>${fmtCost(cost)}</strong><br>${fmtTokens(rowTokens(row))} tok`;
+
   if (kind === "daily") {
     const d = parsePeriodDate(raw);
-    if (d) {
-      return `${fmtDateDashWeekday(d)}<br><strong>${fmtCost(cost)}</strong><br>${fmtTokens(rowTokens(row))} tok`;
-    }
+    if (d) return `${fmtDateDashWeekday(d)}<br>${body}`;
   }
   const label = (kind === "monthly" && fmtMonthName(raw, true)) || (raw ? String(raw) : "—");
-  return `${label}<br><strong>${fmtCost(cost)}</strong><br>${fmtTokens(rowTokens(row))} tok`;
+  return `${label}<br>${body}`;
 }
 
 function currentPeriodRow(rows, kind, labelKey) {
@@ -612,11 +676,12 @@ function renderChart(rows, labelKey, kind) {
   const bars = rows
     .map((row, i) => {
       const cost = rowCost(row);
-      const barPx = Math.max(4, Math.round((cost / max) * CHART_BAR_HEIGHT));
+      const empty = row.isEmpty || !cost;
+      const barPx = empty ? 2 : Math.max(4, Math.round((cost / max) * CHART_BAR_HEIGHT));
       return `
         <div class="bar-col" tabindex="0" data-bar-idx="${i}">
           <div class="bar-track">
-            <div class="bar-fill" style="height: ${barPx}px"></div>
+            <div class="bar-fill${empty ? " bar-empty" : ""}" style="height: ${barPx}px"></div>
           </div>
         </div>`;
     })
@@ -753,7 +818,7 @@ function renderTable(rows, labelKey, kind) {
           (row) => {
             const expandable = row.modelBreakdowns?.length > 0;
             return `
-      <tr class="period-row${expandable ? " expandable" : ""}"${expandable ? " tabindex=\"0\" role=\"button\" aria-expanded=\"false\"" : ""}>
+      <tr class="period-row${expandable ? " expandable" : ""}${row.isEmpty ? " empty-row" : ""}"${expandable ? " tabindex=\"0\" role=\"button\" aria-expanded=\"false\"" : ""}>
         <td class="mono">${expandable ? '<input type="checkbox" class="breakdown-cb" hidden tabindex="-1">' : ""}${periodCell(row, labelKey, kind)}</td>
         <td class="models-cell">
           <div class="models-inline">
@@ -766,7 +831,7 @@ function renderTable(rows, labelKey, kind) {
         <td class="num">${fmtTokens(row.cacheCreationTokens)}</td>
         <td class="num">${fmtTokens(row.cacheReadTokens)}</td>
         <td class="num">${fmtTokens(row.totalTokens)}</td>
-        <td class="cost">${fmtCost(rowCost(row))}</td>
+        <td class="cost">${row.isEmpty ? '<span class="text-dim">—</span>' : fmtCost(rowCost(row))}</td>
       </tr>
       ${expandable ? `<tr class="subrow"><td colspan="8">${breakdownTableHtml(row.modelBreakdowns)}</td></tr>` : ""}`;
           },
