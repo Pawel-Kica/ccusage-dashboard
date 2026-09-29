@@ -1,6 +1,6 @@
 # CC Usage Dashboard
 
-Local browser UI for [ccusage](https://github.com/ryoppippi/ccusage) — Claude Code usage and costs. Dark dashboard with daily/weekly/monthly charts, model breakdowns, and a 30-day default view.
+Local browser UI for [ccusage](https://github.com/ryoppippi/ccusage): your Claude Code usage and costs. Dark dashboard with daily/weekly/monthly charts, model breakdowns, and a 30-day default view.
 
 ![CC Usage Dashboard](docs/screenshot.png)
 
@@ -13,7 +13,7 @@ Local browser UI for [ccusage](https://github.com/ryoppippi/ccusage) — Claude 
 ## Quick start
 
 ```bash
-git clone git@github.com:Pawel-Kica/ccusage-dashboard.git
+git clone https://github.com/Pawel-Kica/ccusage-dashboard.git
 cd ccusage-dashboard
 npm install
 npm run open
@@ -23,7 +23,7 @@ Opens [http://127.0.0.1:3847](http://127.0.0.1:3847) in your browser.
 
 ## Run in the background (macOS)
 
-Install as a LaunchAgent — always on, fixed port, survives reboot:
+Install as a LaunchAgent. Always on, fixed port, survives reboot:
 
 ```bash
 npm run install-service
@@ -42,7 +42,7 @@ npm run uninstall-service
 | Command | Description |
 |---|---|
 | `npm start` | Start server (port 3847) |
-| `npm run open` | Start server and open browser |
+| `npm run open` | Start server and open browser (macOS) |
 | `npm run install-service` | Install macOS LaunchAgent (background) |
 | `npm run uninstall-service` | Remove LaunchAgent |
 
@@ -53,7 +53,7 @@ npm run uninstall-service
 | `PORT` | `3847` | HTTP port |
 | `CACHE_TTL_MS` | `300000` | Server-side cache TTL (5 min) |
 
-Example — different port for install:
+Different port for the service:
 
 ```bash
 PORT=4000 npm run install-service
@@ -67,4 +67,4 @@ PORT=4000 npm run install-service
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
